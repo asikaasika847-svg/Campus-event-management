@@ -1,0 +1,6 @@
+{
+  "name": "Campus Event Management System",
+  "description": "Comprehensive student registration, secure authentication, event discovery, live seat reservations, and personal dashboard for campus events.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

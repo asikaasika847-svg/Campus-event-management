@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for Campus Event Management System
+// Enforces least-privilege access, content-type verification, and payload size bounds.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'asikaasika847@gmail.com' ||
+        request.auth.token.email == 'admin@campus.edu' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    function isImageFile() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
+    }
+
+    function isUnderMaxSize(maxMegabytes) {
+      return request.resource.size <= maxMegabytes * 1024 * 1024;
+    }
+
+    // Default deny-all safety net
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Event Posters:
+    // - Publicly readable by all students and guests
+    // - Uploadable/deletable ONLY by authorized administrators
+    // - Must be image format and <= 5MB
+    match /events/{eventId}/poster/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImageFile() && isUnderMaxSize(5);
+      allow delete: if isAdmin();
+    }
+
+    // 2. Student Profile Avatars (Optional):
+    // - Readable by authenticated students/faculty
+    // - Uploadable ONLY by the owning student for their own UID folder
+    // - Must be image format and <= 2MB
+    match /users/{userId}/avatar/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isImageFile() && isUnderMaxSize(2);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // 3. Event Attachments / Handouts:
+    // - Downloadable by authenticated registered students
+    // - Uploadable only by event organizers / admins
+    match /events/{eventId}/materials/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isUnderMaxSize(10);
+      allow delete: if isAdmin();
+    }
+  }
+}

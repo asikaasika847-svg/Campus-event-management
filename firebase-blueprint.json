@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "admins": {
+      "title": "AdminRole",
+      "description": "System administrator mapping stored in database to prevent client claim spoofing",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "superadmin"] },
+        "assignedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "students": {
+      "title": "StudentProfile",
+      "description": "Student academic and profile data without sensitive credentials like passwords",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "collegeEmail": { "type": "string", "maxLength": 120, "pattern": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" },
+        "studentId": { "type": "string", "minLength": 3, "maxLength": 30, "pattern": "^[A-Za-z0-9_-]+$" },
+        "department": { "type": "string", "maxLength": 80 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "bio": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "fullName", "collegeEmail", "studentId", "department"]
+    },
+    "events": {
+      "title": "CampusEvent",
+      "description": "Campus event metadata, scheduling, venue, category, and capacity tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 3000 },
+        "category": { "type": "string", "enum": ["Technical", "Cultural", "Sports", "Workshop", "Symposium"] },
+        "posterUrl": { "type": "string", "maxLength": 500 },
+        "eventDate": { "type": "string", "maxLength": 30 },
+        "startTime": { "type": "string", "maxLength": 20 },
+        "endTime": { "type": "string", "maxLength": 20 },
+        "venue": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "organizer": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "registrationDeadline": { "type": "string", "maxLength": 30 },
+        "maxCapacity": { "type": "number" },
+        "registeredCount": { "type": "number" },
+        "isPublished": { "type": "boolean" },
+        "isCancelled": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["title", "description", "category", "eventDate", "startTime", "endTime", "venue", "organizer", "registrationDeadline", "maxCapacity"]
+    },
+    "registrations": {
+      "title": "EventRegistration",
+      "description": "Student event registration record enforcing single booking and status management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 30 },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "studentEmail": { "type": "string", "maxLength": 120 },
+        "department": { "type": "string", "maxLength": 80 },
+        "eventId": { "type": "string", "maxLength": 128 },
+        "eventTitle": { "type": "string", "maxLength": 120 },
+        "eventDate": { "type": "string", "maxLength": 30 },
+        "eventVenue": { "type": "string", "maxLength": 120 },
+        "registeredAt": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["confirmed", "cancelled", "attended"] },
+        "cancelledAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["studentUid", "studentId", "studentName", "studentEmail", "eventId", "eventTitle", "status"]
+    },
+    "notifications": {
+      "title": "AppNotification",
+      "description": "In-app notification records for event confirmations, cancellations, schedule changes, and announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "recipientId": { "type": "string", "maxLength": 128 },
+        "eventId": { "type": "string", "maxLength": 128 },
+        "eventTitle": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "enum": ["registration_success", "registration_cancelled", "event_updated", "event_cancelled", "announcement"] },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "message": { "type": "string", "minLength": 5, "maxLength": 1000 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["recipientId", "type", "title", "message", "isRead", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/admins" },
+      "description": "Authoritative list of system admins for backend role verification"
+    },
+    "/students/{studentUid}": {
+      "schema": { "$ref": "#/entities/students" },
+      "description": "Private student profiles accessible only by verified student owner or system admins"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/events" },
+      "description": "Campus events catalog manageable by administrators and viewable by public"
+    },
+    "/registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/registrations" },
+      "description": "Event booking records accessible by the registered student and system admins"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/notifications" },
+      "description": "Private notifications for students regarding RSVPs, schedule changes, and campus alerts"
+    }
+  }
+}

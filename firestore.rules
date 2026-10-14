@@ -1,0 +1,161 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global deny-by-default safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Authoritative Admin check based on trusted admin document or runtime bootstrapped email
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'asikaasika847@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['title', 'description', 'category', 'eventDate', 'startTime', 'endTime', 'venue', 'organizer', 'registrationDeadline', 'maxCapacity']) &&
+        data.keys().hasOnly(['id', 'title', 'description', 'category', 'posterUrl', 'eventDate', 'startTime', 'endTime', 'venue', 'organizer', 'registrationDeadline', 'maxCapacity', 'registeredCount', 'isPublished', 'isCancelled', 'isFeatured', 'tags', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 120 &&
+        data.description is string && data.description.size() >= 10 && data.description.size() <= 3000 &&
+        data.category in ['Technical', 'Cultural', 'Sports', 'Workshop', 'Symposium'] &&
+        data.eventDate is string && data.eventDate.size() <= 30 &&
+        data.startTime is string && data.startTime.size() <= 20 &&
+        data.endTime is string && data.endTime.size() <= 20 &&
+        data.venue is string && data.venue.size() >= 2 && data.venue.size() <= 120 &&
+        data.organizer is string && data.organizer.size() >= 2 && data.organizer.size() <= 100 &&
+        data.registrationDeadline is string && data.registrationDeadline.size() <= 30 &&
+        data.maxCapacity is number && data.maxCapacity > 0 && data.maxCapacity <= 10000;
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['uid', 'fullName', 'collegeEmail', 'studentId', 'department']) &&
+        data.keys().hasOnly(['uid', 'fullName', 'collegeEmail', 'studentId', 'department', 'phone', 'bio', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid == request.auth.uid &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+        data.collegeEmail is string && data.collegeEmail.size() <= 120 &&
+        data.studentId is string && data.studentId.size() >= 3 && data.studentId.size() <= 30 &&
+        data.department is string && data.department.size() <= 80 &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 20)) &&
+        (!('bio' in data) || (data.bio is string && data.bio.size() <= 300));
+    }
+
+    function isValidRegistration(data) {
+      return data.keys().hasAll(['studentUid', 'studentId', 'studentName', 'studentEmail', 'eventId', 'eventTitle', 'status']) &&
+        data.keys().hasOnly(['id', 'studentUid', 'studentId', 'studentName', 'studentEmail', 'department', 'eventId', 'eventTitle', 'eventDate', 'eventVenue', 'registeredAt', 'status', 'cancelledAt']) &&
+        data.studentUid is string && data.studentUid == request.auth.uid &&
+        data.studentId is string && data.studentId.size() <= 30 &&
+        data.studentName is string && data.studentName.size() <= 100 &&
+        data.studentEmail is string && data.studentEmail.size() <= 120 &&
+        data.eventId is string && isValidId(data.eventId) &&
+        data.eventTitle is string && data.eventTitle.size() <= 120 &&
+        data.status in ['confirmed', 'cancelled', 'attended'];
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['recipientId', 'type', 'title', 'message', 'isRead', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'recipientId', 'eventId', 'eventTitle', 'type', 'title', 'message', 'isRead', 'createdAt']) &&
+        data.recipientId is string &&
+        data.type in ['registration_success', 'registration_cancelled', 'event_updated', 'event_cancelled', 'announcement'] &&
+        data.title is string && data.title.size() <= 120 &&
+        data.message is string && data.message.size() <= 1000 &&
+        data.isRead is bool;
+    }
+
+    // Admins registry: readable only by verified admins, writes locked
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && (request.auth.uid == adminUid || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // Student Profiles: Owner read/write only, or Admin read
+    match /students/{studentUid} {
+      allow get: if isValidId(studentUid) && (isOwner(studentUid) || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(studentUid) && isOwner(studentUid) && isValidStudent(incoming());
+      allow update: if isValidId(studentUid) && isOwner(studentUid) && isValidStudent(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().studentId == existing().studentId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'department', 'phone', 'bio', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Campus Events: Public read if published; Admin has full CRUD
+    match /events/{eventId} {
+      allow get: if isValidId(eventId) && (resource.data.isPublished == true || isAdmin());
+      allow list: if resource.data.isPublished == true || isAdmin();
+      allow create: if isValidId(eventId) && isAdmin() && isValidEvent(incoming());
+      allow update: if isValidId(eventId) && (
+        (isAdmin() && isValidEvent(incoming())) ||
+        // Standard student atomic seat count update via transaction
+        (isSignedIn() &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['registeredCount']) &&
+          incoming().registeredCount >= 0 &&
+          incoming().registeredCount <= existing().maxCapacity)
+      );
+      allow delete: if isValidId(eventId) && isAdmin();
+    }
+
+    // Registrations: Student owns their registrations; Admin can view participants for any event
+    match /registrations/{registrationId} {
+      allow get: if isValidId(registrationId) && (isOwner(resource.data.studentUid) || isAdmin());
+      allow list: if (isSignedIn() && resource.data.studentUid == request.auth.uid) || isAdmin();
+      allow create: if isValidId(registrationId) &&
+        isSignedIn() &&
+        incoming().studentUid == request.auth.uid &&
+        isValidRegistration(incoming()) &&
+        exists(/databases/$(database)/documents/events/$(incoming().eventId));
+      
+      allow update: if isValidId(registrationId) && (
+        isAdmin() ||
+        (isSignedIn() &&
+          existing().studentUid == request.auth.uid &&
+          incoming().studentUid == existing().studentUid &&
+          incoming().eventId == existing().eventId &&
+          incoming().status == 'cancelled' &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cancelledAt']))
+      );
+
+      allow delete: if isValidId(registrationId) && isAdmin();
+    }
+
+    // Notifications: Recipient isolation (only recipient can read/list/update isRead/delete)
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow create: if isValidId(notificationId) && isSignedIn() && (
+        incoming().recipientId == request.auth.uid || isAdmin()
+      ) && isValidNotification(incoming());
+      allow update: if isValidId(notificationId) && isSignedIn() &&
+        existing().recipientId == request.auth.uid &&
+        incoming().recipientId == existing().recipientId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isValidId(notificationId) && isSignedIn() && existing().recipientId == request.auth.uid;
+    }
+  }
+}
