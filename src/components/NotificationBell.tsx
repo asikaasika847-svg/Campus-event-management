@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { AppNotification } from '../types';
 import { firebaseService } from '../services/firebaseService';
@@ -12,6 +12,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onGoToDashbo
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(async () => {
     if (!user) return;
@@ -22,6 +23,22 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onGoToDashbo
       console.warn('Failed to fetch notifications:', err);
     }
   }, [user]);
+
+  // Click outside listener for notification dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -81,13 +98,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onGoToDashbo
   };
 
   return (
-    <div className="dropdown position-relative">
+    <div className="dropdown position-relative" ref={dropdownRef}>
       <button
         className="btn btn-outline-light btn-sm rounded-circle position-relative p-0 d-flex align-items-center justify-content-center"
         style={{ width: '34px', height: '34px' }}
         type="button"
         id="notificationDropdownButton"
-        data-bs-toggle="dropdown"
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
         aria-label={`Notifications, ${unreadCount} unread`}
@@ -105,8 +121,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onGoToDashbo
       </button>
 
       <div
-        className="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0 rounded-4 overflow-hidden mt-2"
-        style={{ width: '340px', maxWidth: '90vw' }}
+        className={`dropdown-menu dropdown-menu-end shadow-lg border-0 p-0 rounded-4 overflow-hidden mt-2 ${isOpen ? 'show' : ''}`}
+        style={{ width: '340px', maxWidth: '90vw', position: 'absolute', right: 0 }}
         aria-labelledby="notificationDropdownButton"
       >
         {/* Dropdown Header */}
@@ -148,6 +164,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onGoToDashbo
                 className={`p-3 border-bottom transition-all ${!n.isRead ? 'bg-primary-subtle bg-opacity-25' : 'bg-white'}`}
                 style={{ cursor: 'pointer' }}
                 onClick={() => {
+                  setIsOpen(false);
                   if (!n.isRead) {
                     firebaseService.markNotificationAsRead(n.id).then(() => loadNotifications());
                   }
@@ -202,7 +219,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onGoToDashbo
               type="button"
               className="btn btn-link btn-sm text-decoration-none text-primary fw-semibold p-0"
               style={{ fontSize: '0.8rem' }}
-              onClick={() => onGoToDashboardTab('notifications')}
+              onClick={() => {
+                setIsOpen(false);
+                onGoToDashboardTab('notifications');
+              }}
             >
               View all {notifications.length} in Dashboard <i className="bi bi-arrow-right"></i>
             </button>

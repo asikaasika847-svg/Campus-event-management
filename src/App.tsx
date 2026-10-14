@@ -161,6 +161,7 @@ function MainLayout() {
           <AdminDashboard
             onOpenAuth={handleOpenAuth}
             onExplorePublicEvents={() => setCurrentView('events')}
+            onOpenTestSuite={() => setIsTestSuiteOpen(true)}
           />
         )}
 

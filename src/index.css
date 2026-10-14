@@ -80,3 +80,69 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ==========================================================================
+   Bootstrap & Tailwind Conflict Resolution: Navbar & Collapse
+   Tailwind CSS includes `.collapse { visibility: collapse; }` which causes
+   Bootstrap's collapsible menu bar to vanish / hide rapidly when opened.
+   We explicitly override this to ensure proper visibility and smooth transitions.
+   ========================================================================== */
+.collapse {
+  visibility: visible !important;
+}
+
+.collapse:not(.show) {
+  display: none !important;
+}
+
+.collapse.show {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Ensure mobile menu container has smooth styling and doesn't get cut off */
+@media (max-width: 991.98px) {
+  .navbar-collapse {
+    background-color: #1e40af;
+    backdrop-filter: blur(12px);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-top: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .navbar-collapse .nav-link {
+    padding: 0.65rem 0.75rem !important;
+    border-radius: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .navbar-collapse .nav-link:hover,
+  .navbar-collapse .nav-link:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+}
+
+@media (min-width: 992px) {
+  .navbar-expand-lg .navbar-collapse {
+    display: flex !important;
+    visibility: visible !important;
+    flex-basis: auto !important;
+  }
+}
+
+/* Brand logo button interactive styles */
+.navbar-brand-btn {
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  outline: none;
+}
+.navbar-brand-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+.navbar-brand-btn:active {
+  transform: translateY(0);
+}
+

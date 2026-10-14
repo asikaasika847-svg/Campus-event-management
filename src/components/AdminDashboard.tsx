@@ -6,6 +6,7 @@ import { firebaseService } from '../services/firebaseService';
 interface AdminDashboardProps {
   onOpenAuth: (tab: 'login' | 'register') => void;
   onExplorePublicEvents: () => void;
+  onOpenTestSuite?: () => void;
 }
 
 const CATEGORIES: EventCategory[] = ['Technical', 'Cultural', 'Sports', 'Workshop', 'Symposium'];
@@ -22,6 +23,7 @@ const SAMPLE_POSTERS = [
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenAuth,
   onExplorePublicEvents,
+  onOpenTestSuite,
 }) => {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -369,7 +371,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </p>
         </div>
 
-        <div className="d-flex gap-2">
+        <div className="d-flex align-items-center gap-2">
+          {onOpenTestSuite && (
+            <button
+              className="btn btn-outline-danger rounded-pill px-3 d-flex align-items-center gap-1 shadow-sm"
+              onClick={onOpenTestSuite}
+              title="Run Automated Security Verification Suite"
+            >
+              <i className="bi bi-shield-check"></i>
+              <span className="d-none d-sm-inline">Run Security Tests</span>
+            </button>
+          )}
           <button
             className="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm d-flex align-items-center gap-2"
             onClick={handleOpenCreate}
